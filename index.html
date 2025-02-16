@@ -1,64 +1,53 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>Skip-Krieg – Das Spiel (Erweitert)</title>
+  <meta charset="UTF-8">
+  <title>Skip-Krieg – Das Spiel (Single-File)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    /* Minimales, responsives Design für Smartphone */
-
+    /* Einfache, responsive Gestaltung */
     body {
       font-family: Arial, sans-serif;
-      margin: 0; 
+      margin: 0;
       padding: 0;
-      background: #f5f5f5; 
+      background: #f5f5f5;
       color: #333;
     }
-
     .container {
       max-width: 600px;
       margin: 0 auto;
       padding: 1rem;
     }
-
     h1, h2, h3 {
       text-align: center;
     }
-
-    .start-screen, .game-screen, .results, .mood-container {
+    .screen {
       background: #fff;
       border-radius: 8px;
       padding: 1rem;
       margin-bottom: 1rem;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-
+    .hidden { display: none; }
     .start-screen {
       text-align: center;
       margin-top: 2rem;
     }
-
     .start-screen button {
       font-size: 1.2rem;
       padding: 0.8rem 1.2rem;
       margin-top: 1rem;
+      cursor: pointer;
     }
-
     label {
       display: block;
       margin: 0.5rem 0;
     }
-
-    .game-screen h2 {
-      margin-top: 0;
-    }
-
     .controls {
       display: flex;
       justify-content: center;
       margin: 1rem 0;
     }
-
     .controls button {
       background: #007BFF;
       color: #fff;
@@ -71,28 +60,21 @@
       flex: 1;
       transition: background 0.3s;
     }
-
     .controls button:hover {
       background: #0056b3;
     }
-
     .controls button:disabled {
       background: #aaa;
       cursor: not-allowed;
     }
-
     .message-area {
       text-align: center;
       padding: 1rem 0;
-      min-height: 3rem; /* reserviert Platz für Meldungen */
+      min-height: 3rem; /* Platz für Meldungen */
     }
-
     .mood-container {
       text-align: center;
-    }
-    .mood-label {
-      margin-bottom: 0.5rem;
-      display: block;
+      margin: 1rem 0;
     }
     .mood-bar {
       width: 100%;
@@ -107,53 +89,48 @@
       background: #28a745;
       transition: width 0.3s;
     }
-
     .results {
       text-align: center;
-    }
-
-    .hidden {
-      display: none;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Skip-Krieg – Das Spiel (Erweitert)</h1>
+    <h1>Skip-Krieg – Das Spiel (Single-File)</h1>
 
     <!-- START-SCREEN: NAME & SITZ AUSWÄHLEN -->
-    <div class="start-screen" id="startScreen">
+    <div class="screen" id="startScreen">
       <p>Willkommen beim epischen Skip-Krieg!<br/>
          Trage deinen Namen ein und entscheide, wo du sitzen möchtest.</p>
       <div>
         <label for="playerName">Dein Name:</label>
-        <input type="text" id="playerName" placeholder="z.B. Max">
+        <input type="text" id="playerName" placeholder="z.B. Max" />
       </div>
       <div>
         <label>Sitzplatz wählen:</label>
         <label>
-          <input type="radio" name="seatChoice" value="front" checked>
+          <input type="radio" name="seatChoice" value="front" checked />
           Vordersitz
         </label>
         <label>
-          <input type="radio" name="seatChoice" value="back">
+          <input type="radio" name="seatChoice" value="back" />
           Rücksitz
         </label>
       </div>
-      <button onclick="initGame()">Spiel starten</button>
+      <button onclick="startGame()">Spiel starten</button>
     </div>
 
     <!-- SPIEL-BEREICH -->
-    <div id="gameArea" class="game-screen hidden">
+    <div class="screen hidden" id="gameArea">
       <h2 id="songTitle">Aktueller Song:</h2>
       <p id="songIndex"></p>
 
       <!-- Stimmungsanzeige -->
       <div class="mood-container">
-        <span class="mood-label">Stimmung im Auto:</span>
         <div class="mood-bar">
           <div class="mood-fill" id="moodFill" style="width: 100%;"></div>
         </div>
+        <p id="moodValue"></p>
       </div>
 
       <div class="controls">
@@ -165,90 +142,94 @@
     </div>
 
     <!-- ERGEBNIS -->
-    <div id="resultsArea" class="results hidden"></div>
+    <div class="screen hidden" id="resultsArea"></div>
   </div>
 
   <script>
-    // -------------------------
-    // Globale Variablen
-    // -------------------------
-    let playlist = [
+    /* 
+      1. Start-Phase: Spieler gibt Namen ein + wählt Sitz
+      2. Skip-Krieg:
+         - Jeder Song: Versuchen zu skippen oder nicht
+         - Spieler-Skill vs. NPC-Skill
+         - Stimmung im Auto (carMood)
+      3. Ergebnis am Ende
+    */
+
+    // Playlist
+    const playlist = [
       "Rom_Overture.mp3",
       "Colosseum_Funk.mp3",
       "Vespa_Vibes.mp3",
       "Pasta_Groove.mp3"
     ];
 
-    // (Basis)Erfolgschancen - wir interpretieren das später je nach Sitz des Spielers
-    // Falls du willst, kannst du später noch verfeinern.
-    let frontSeatSkill = 50; 
-    let backSeatSkill  = 50;
+    // Basis-Skills (in %)
+    const baseFrontSkill = 50;
+    const baseBackSkill  = 50;
 
-    // Zusätzliche Namen und Skills für NPC (der Gegenpart)
-    let npcNameFront = "Luigi (Front)";
-    let npcNameBack  = "Mario (Back)";
-    let npcSkillFront = 50;
-    let npcSkillBack  = 50;
+    // NPC-Infos
+    const npcNameFront  = "Luigi (Front)";
+    const npcNameBack   = "Mario (Back)";
+    const npcSkillFront = 50;
+    const npcSkillBack  = 50;
 
-    // Variablen, die wir vom Nutzer erfragen
+    // Benutzer-Eingaben
     let playerName = "";
     let playerSeat = ""; // "front" oder "back"
 
-    // Zähler für Skips
+    // Skip-Zähler
     let frontSeatSkips = 0;
     let backSeatSkips  = 0;
 
-    // Index für die Playlist
+    // Aktueller Songindex
     let currentSongIndex = 0;
 
-    // Stimmung im Auto (0-100)
+    // Stimmung (0-100)
     let carMood = 100;
 
     // -------------------------
-    // Initialisierung per UI
+    // SPIEL STARTEN
     // -------------------------
-    function initGame() {
-      // Name und Sitzplatz auslesen
+    function startGame() {
       const nameField = document.getElementById('playerName');
+      const seatChoice = document.querySelector('input[name="seatChoice"]:checked');
+
       if (!nameField.value.trim()) {
         alert("Bitte gib einen Namen ein!");
         return;
       }
       playerName = nameField.value.trim();
-
-      const seatChoice = document.querySelector('input[name="seatChoice"]:checked');
       playerSeat = seatChoice ? seatChoice.value : "front";
 
-      // Spielvariablen zurücksetzen
+      // Variablen zurücksetzen (falls neu gestartet)
       frontSeatSkips = 0;
       backSeatSkips  = 0;
       currentSongIndex = 0;
       carMood = 100;
 
-      // UI-Anpassungen
+      // Start-Bildschirm ausblenden, Spiel-Bereich anzeigen
       document.getElementById('startScreen').classList.add('hidden');
       document.getElementById('gameArea').classList.remove('hidden');
       document.getElementById('resultsArea').classList.add('hidden');
 
-      // Willkommens-Meldung
-      showMessage(`Willkommen, ${playerName} auf dem ${playerSeat === "front" ? "Vordersitz" : "Rücksitz"}!`);
+      // Ersten Song anzeigen, Stimmung aktualisieren
       showSong();
-      updateMood(0); // Stimmung initialisieren
+      updateMood(0);
+      showMessage(`Willkommen, ${playerName} auf dem ${playerSeat === "front" ? "Vordersitz" : "Rücksitz"}!`);
     }
 
     // -------------------------
-    // Hilfsfunktionen
+    // SONG + LAYOUT
     // -------------------------
     function showSong() {
       if (currentSongIndex >= playlist.length) {
-        // Playlist zu Ende -> Ergebnis anzeigen
+        // Keine Songs mehr -> Ende
         endGame();
         return;
       }
-
-      let title = playlist[currentSongIndex];
+      const title = playlist[currentSongIndex];
       document.getElementById('songTitle').textContent = title;
-      document.getElementById('songIndex').textContent =
+      document.getElementById('songIndex').textContent = 
         `Song ${currentSongIndex + 1} von ${playlist.length}`;
     }
 
@@ -256,71 +237,139 @@
       document.getElementById('messageArea').textContent = msg;
     }
 
-    // Funktion, um die Stimmung zu aktualisieren
+    // -------------------------
+    // STIMMUNG AKTUALISIEREN
+    // -------------------------
     function updateMood(delta) {
-      // delta kann positiv oder negativ sein
       carMood += delta;
       if (carMood > 100) carMood = 100;
-      if (carMood < 0) carMood = 0;
+      if (carMood < 0)   carMood = 0;
 
-      // Aktualisiere Balken
-      const moodFill = document.getElementById('moodFill');
+      const moodFill  = document.getElementById('moodFill');
+      const moodValue = document.getElementById('moodValue');
+
       moodFill.style.width = carMood + "%";
+      moodValue.textContent = `Stimmung im Auto: ${carMood}%`;
 
-      // Farbe anpassen (z.B. rot, wenn < 30, gelb zwischen 30-70, grün, wenn > 70)
+      // Farbe nach Stimmung
       if (carMood >= 70) {
-        moodFill.style.background = "#28a745"; // grün
+        moodFill.style.backgroundColor = "#28a745"; // grün
       } else if (carMood >= 30) {
-        moodFill.style.background = "#ffc107"; // gelb
+        moodFill.style.backgroundColor = "#ffc107"; // gelb
       } else {
-        moodFill.style.background = "#dc3545"; // rot
+        moodFill.style.backgroundColor = "#dc3545"; // rot
       }
     }
 
+    // -------------------------
+    // SKIP ODER NICHT
+    // -------------------------
+    function handleSkip() {
+      // 1) Spieler versucht zu skippen
+      let skillCheck, otherSeat, skipperName;
+      if (playerSeat === "front") {
+        skillCheck = baseFrontSkill;
+        otherSeat = "back";
+        skipperName = `${playerName} (Front)`;
+      } else {
+        skillCheck = baseBackSkill;
+        otherSeat = "front";
+        skipperName = `${playerName} (Back)`;
+      }
+
+      showMessage(`${skipperName} drückt auf den Skip-Knopf...`);
+      setTimeout(() => {
+        let roll = Math.random() * 100;
+        if (roll < skillCheck) {
+          // Erfolg für den Spieler
+          showMessage("Erfolgreich! Der Song wird geskippt!");
+          if (playerSeat === "front") {
+            frontSeatSkips++;
+          } else {
+            backSeatSkips++;
+          }
+          updateMood(-10);
+          currentSongIndex++;
+          setTimeout(showSong, 1500);
+        } else {
+          // Gescheitert -> NPC versucht es
+          let npcName, npcSkill;
+          if (otherSeat === "front") {
+            npcName  = npcNameFront;
+            npcSkill = npcSkillFront;
+          } else {
+            npcName  = npcNameBack;
+            npcSkill = npcSkillBack;
+          }
+          showMessage(`${skipperName} scheitert... Nun versucht es ${npcName}.`);
+
+          setTimeout(() => {
+            let npcRoll = Math.random() * 100;
+            if (npcRoll < npcSkill) {
+              showMessage(`${npcName} schafft den Skip!`);
+              if (otherSeat === "front") {
+                frontSeatSkips++;
+              } else {
+                backSeatSkips++;
+              }
+              updateMood(-15);
+              currentSongIndex++;
+              setTimeout(showSong, 1500);
+            } else {
+              showMessage(`${npcName} versagt ebenfalls! Song läuft weiter.`);
+              // Keine Skips -> Stimmung steigt etwas
+              updateMood(+5);
+              currentSongIndex++;
+              setTimeout(showSong, 1500);
+            }
+          }, 1500);
+        }
+      }, 1500);
+    }
+
+    function handleNoSkip() {
+      // Kein Skip-Versuch
+      showMessage("Kein Skip – alle entspannen sich etwas...");
+      updateMood(+10);
+      currentSongIndex++;
+      setTimeout(showSong, 1500);
+    }
+
+    // -------------------------
+    // SPIEL BEENDET
+    // -------------------------
     function endGame() {
       document.getElementById('gameArea').classList.add('hidden');
       const results = document.getElementById('resultsArea');
       results.classList.remove('hidden');
 
-      let resText = `
+      let resultHTML = `
         <h2>Playlist beendet!</h2>
-        <p>Statistik:</p>
-        <p>Front Seat erfolgreiche Skips: ${frontSeatSkips}</p>
-        <p>Back Seat erfolgreiche Skips: ${backSeatSkips}</p>
+        <p>Front Seat Skips: ${frontSeatSkips}</p>
+        <p>Back Seat Skips: ${backSeatSkips}</p>
       `;
 
-      // Wer hat gewonnen?
       if (frontSeatSkips > backSeatSkips) {
-        resText += `<p><strong>Die VORDERE Sitzreihe triumphiert!</strong></p>`;
+        resultHTML += `<p><strong>Vordere Sitzreihe gewinnt den Skip-Krieg!</strong></p>`;
       } else if (backSeatSkips > frontSeatSkips) {
-        resText += `<p><strong>Die HINTERE Sitzreihe siegt!</strong></p>`;
+        resultHTML += `<p><strong>Hintere Sitzreihe hat den Kampf gewonnen!</strong></p>`;
       } else {
-        resText += `<p><strong>Unentschieden! Keine Finger waren laenger.</strong></p>`;
+        resultHTML += `<p><strong>Unentschieden! Keine längeren Arme, keine kürzeren Finger.</strong></p>`;
       }
 
-      // Schauen wir uns noch die Stimmung an
-      resText += `<p>Endgültige Stimmung im Auto: ${carMood}%</p>`;
-      if (carMood > 70) {
-        resText += `<p>Die Laune ist super. Ihr seid bereit für Rom!</p>`;
-      } else if (carMood > 30) {
-        resText += `<p>Die Fahrt war okay, aber etwas angespannt. Zeit für eine Pause!</p>`;
+      resultHTML += `
+        <p>Endstimmung im Auto: ${carMood}%</p>
+      `;
+      if (carMood >= 70) {
+        resultHTML += `<p>Gute Laune! Perfekt für die Ankunft in Rom!</p>`;
+      } else if (carMood >= 30) {
+        resultHTML += `<p>Die Laune ist durchwachsen. Gönnt euch eine Pause!</p>`;
       } else {
-        resText += `<p>Die Nerven liegen blank. Vielleicht etwas Klassik zum Runterkommen?</p>`;
+        resultHTML += `<p>Die Stimmung ist im Keller – Zeit für ein Friedenslied!</p>`;
       }
 
-      results.innerHTML = resText;
+      results.innerHTML = resultHTML;
     }
-
-    // -------------------------
-    // Haupt-Spielmechanik
-    // -------------------------
-    function handleSkip() {
-      // User möchte skippen -> Duell
-      // Wer versucht es: der Spieler oder der NPC?
-      let seatDoingSkip;
-      let skillCheck;
-      let skipperName;
-
-      // Wir entscheiden hier:  
-      // - Falls der Spieler SKIP drückt, probiert *zuerst* der Spieler (also dein Sitz) 
-      //   sein Glück. Scheitert er
+  </script>
+</body>
+</html>
